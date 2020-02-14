@@ -10,14 +10,15 @@ train = pd.read_csv("train.csv")
 test = pd.read_csv("test.csv")
 
 #features explained:
-    #Pclass - passenger's class (1, 2, 3)
-    #SibSp - no, of siblings(rodzeństwo)/spouses(małżonków);
+    #Pclass - passenger class (1, 2, 3)
+    #SibSp - no. of siblings(rodzeństwo)/spouses(małżonków);
     #Parch - no. of parents/children
     #Fare - cost of the ticket
     #Embarked - where the passenger got on the ship
 
 #let's drop not useful features
 train = train.drop(columns = ["PassengerId", "Name", "Ticket"])
+test_id = test["PassengerId"]
 test = test.drop(columns = ["PassengerId", "Name", "Ticket"])
 print(train.head()) #returns first 5 rows on defafult
 
@@ -62,6 +63,7 @@ print("\n=========== After filling missing values =============")
 print(train.isnull().sum())
 
 #3. Plotting data
+"""
 for cat in categorical_features:
     sns.countplot(train[cat])
     plt.show()
@@ -69,6 +71,7 @@ for cat in categorical_features:
 for num in numerical_features:
     sns.distplot(train[num])
     plt.show()
+"""
 
 #4. Handling categorical data
 for category in categorical_features:
@@ -91,55 +94,69 @@ print(train.head())
 
 # 4. Fixing outliers & standarization & log transformation
 #let's see Age one more time
+"""
 sns.distplot(train["Age"]).set_title("Before standarization") #feature distribution
 plt.show()
+"""
 
 #almost normal distribution - standarization will be the most effective
 from sklearn import preprocessing
-train["Age"] = preprocessing.scale(train["Age"].reshape(-1, 1)) #need to convert to a list
-test["Age"] = preprocessing.scale(test["Age"].reshape(-1, 1))
+"""
+train["Age"] = preprocessing.scale(list(train["Age"])) #converting to list to avoid errors
+test["Age"] = preprocessing.scale(list(test["Age"]))
+"""
+train["Age"] = preprocessing.scale(train["Age"].to_numpy().reshape(-1, 1))
+test["Age"] = preprocessing.scale(test["Age"].to_numpy().reshape(-1, 1))
 
-#dumping outliers
+#discarding outliers
 train.drop(train[(train["Age"] < -3) | (train["Age"] > 3)].index, inplace = True)
-test.drop(test[(test["Age"] < -3) | (test["Age"] > 3)].index, inplace = True)
+#test.drop(test[(test["Age"] < -3) | (test["Age"] > 3)].index, inplace = True)
 #pandas uses different logical operators than Python
+
 """
 OGARNĄĆ
 https://thispointer.com/python-pandas-how-to-drop-rows-in-dataframe-by-conditions-on-column-values/
 """
 
+"""
 sns.distplot(train["Age"]).set_title("After standarization")
 plt.show()
 
-sns.distplot(train["Fare"]).set_title("Before norm & log transform") #skewed data
+sns.distplot(train["Fare"]).set_title("Before log transform") #skewed data
 plt.show()
+"""
+
 """
 OGARNĄĆ
 https://towardsdatascience.com/feature-engineering-for-machine-learning-3a5e293a5114
++ sklearn, pandas a numpy (Series itp. - struktury danych)
 """
-train["Fare"] = preprocessing.normalize(list(train["Fare"]))
-test["Fare"] = preprocessing.normalize(list(test["Fare"]))
 
 train["Fare"] = (train["Fare"] + 1).transform(np.log)
 test["Fare"] = (test["Fare"] + 1).transform(np.log)
 
-#zobaczmy, co się zmieniło - chyba wygląda lepiej!
-sns.distplot(train["Fare"]).set_title("After norm & log transform")
+"""
+sns.distplot(train["Fare"]).set_title("After log transform")
 plt.show()
+"""
 
-#w teście w ogóle nie ma kolumny T! Trzeba ją usunąć z traina
-train = train.drop(columns = ["Cabin: T"])
-
-print("\n=========== Finally =============") #chyba już dużo zrobiłem - spróbujmy coś przewidzieć!
+print("\n=========== Finally =============")
 print(train.head())
 
 print("\n=========== Preprocessed test =============")
 print(test.head())
 
+#Woops! There is no T cabin column in the test set (features number doesn't match)
+train = train.drop(columns = ["Cabin: T"])
+
+# 5. Training time
 from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
 
 train_y = train["Survived"]
 train = train.drop(columns = ["Survived"])
-clf = SVC(gamma = "auto")
+clf = SVC(kernel = "linear")
 clf.fit(train, train_y)
 test_y = clf.predict(test)
+submission = pd.DataFrame({"PassengerId" : test_id, "Survived" : test_y})
+submission.to_csv("submission.csv", index = False)
